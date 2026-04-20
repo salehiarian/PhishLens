@@ -7,7 +7,7 @@ __pycache__/
 .streamlit/secrets.toml
 .idea/
 Test/
-rests/
+tests/
 email_example.txt
 *.command
 *.bat
