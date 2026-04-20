@@ -1,8 +1,6 @@
 [server]
 headless = true
+maxUploadSize = 20
 
 [client]
 showErrorDetails = true
-
-[server]
-maxUploadSize = 20
