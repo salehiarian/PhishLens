@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.log
+.DS_Store
+.streamlit/secrets.toml
+.idea/
+Test/
+rests/
+email_example.txt
+*.command
+*.bat
