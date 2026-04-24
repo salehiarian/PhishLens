@@ -35,6 +35,10 @@ from data.suspicious_phrases import (
     SPAM_LURE_PHRASES, strong_phrases, weak_terms, GENERIC_GREETING_PHRASES,
 )
 
+def dedupe_keep_order(items: Sequence[str]) -> list[str]:
+    return list(dict.fromkeys(items))
+
+
 def normalize_lookalike_text(text: str) -> str:
     normalized = text.lower()
 
@@ -261,7 +265,7 @@ def check_suspicious_link_domain(parsed: ParsedEmail) -> RuleResult:
         triggered=triggered,
         weight=18,
         reason="Link domain looks suspicious",
-        evidence=suspicious_domains,
+        evidence=dedupe_keep_order(suspicious_domains),
     )
 
 
@@ -313,7 +317,7 @@ def check_shortened_url(parsed: ParsedEmail) -> RuleResult:
         triggered=triggered,
         weight=10,
         reason="Shortened URL detected",
-        evidence=hits,
+        evidence=dedupe_keep_order(hits),
     )
 
 
@@ -381,7 +385,7 @@ def check_ip_based_link(parsed: ParsedEmail) -> RuleResult:
         triggered=bool(hits),
         weight=IP_BASED_WEIGHT,
         reason="Link uses an IP address instead of a normal domain",
-        evidence=hits,
+        evidence=dedupe_keep_order(hits),
     )
 
 def check_punycode_link(parsed: ParsedEmail) -> RuleResult:
@@ -398,7 +402,7 @@ def check_punycode_link(parsed: ParsedEmail) -> RuleResult:
         triggered=bool(hits),
         weight=PUNYCODE_LINK_WEIGHT,
         reason="Link may use a lookalike domain",
-        evidence=hits,
+        evidence=dedupe_keep_order(hits),
     )
 
 def check_many_links_in_short_email(parsed: ParsedEmail) -> RuleResult:
@@ -432,7 +436,7 @@ def check_suspicious_url_keywords(parsed: ParsedEmail) -> RuleResult:
         triggered=bool(hits),
         weight=SUSPICIOUS_URL_KEYWORD_WEIGHT,
         reason="URL contains suspicious login or verification wording",
-        evidence=hits,
+        evidence=dedupe_keep_order(hits),
     )
 
 
@@ -450,7 +454,7 @@ def check_too_many_subdomains(parsed: ParsedEmail) -> RuleResult:
         triggered=bool(hits),
         weight=TOO_MANY_SUBDOMAINS_WEIGHT,
         reason="Link uses an unusually deep subdomain structure",
-        evidence=hits,
+        evidence=dedupe_keep_order(hits),
     )
 
 def check_excessive_punctuation_or_caps(parsed: ParsedEmail) -> RuleResult:
@@ -502,7 +506,7 @@ def check_long_or_messy_domain(parsed: ParsedEmail) -> RuleResult:
         triggered=bool(hits),
         weight=LONG_MESSY_DOMAIN_WEIGHT,
         reason="Link domain looks unusually long or cluttered",
-        evidence=hits,
+        evidence=dedupe_keep_order(hits),
     )
 
 def get_ai_weight(ai_result: AIResult) -> float:
@@ -570,6 +574,7 @@ def check_lookalike_domain_typosquat(parsed: ParsedEmail) -> RuleResult:
         candidates.append(parsed.reply_to_domain)
 
     candidates.extend(parsed.url_domains)
+    candidates = dedupe_keep_order(candidates)
 
     text_blob = build_search_text(parsed.subject, parsed.from_raw, parsed.body_text)
     debug(
@@ -602,6 +607,7 @@ def check_lookalike_domain_typosquat(parsed: ParsedEmail) -> RuleResult:
             if is_lookalike_domain(host, brand):
                 evidence.append(f"{domain} looks similar to {brand}")
 
+    evidence = dedupe_keep_order(evidence)
     triggered = bool(evidence)
 
     debug("LOOKALIKE_RULE_DEBUG",
@@ -672,7 +678,7 @@ def score_rules(rule_results: Sequence[RuleResult]) -> AnalysisResult:
     if raw_score == 0:
         score = 0
     elif raw_score >= 90 and strong_rule_count >= 4:
-        score = 100
+        score = MAX_SCORE
     else:
         score = min(raw_score, 95)
 
