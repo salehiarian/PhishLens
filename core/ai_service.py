@@ -101,8 +101,8 @@ def _build_prompt_instructions() -> str:
     return """
 You are a pro phishing email triage assistant. You are reviewing an email for possible phishing, scam, or spam risk.
 
-Use only the facts provided below.
-Do not add facts, guesses, or recommendations that are not supported by the input.
+Base your assessment on the full email content and details provided below.
+You may use your own judgment to assess how suspicious the email appears, but do not invent facts that are not supported by the input.
 Write clearly and simply for a non-technical user.
 
 Return only valid JSON in this exact format:
@@ -111,7 +111,7 @@ Return only valid JSON in this exact format:
   "category": "safe",
   "confidence": "low",
   "reasons": ["short reason 1", "short reason 2", ...],
-  "explanation": "4 to 8 lines in plain language"
+  "explanation": "5 to 10 lines in plain language"
 }
 
 Rules:
@@ -119,7 +119,8 @@ Rules:
 - category must be one of: safe, spam, phishing, scam
 - confidence must be one of: low, medium, high
 - reasons must contain only short, evidence-based phrases
-- explanation must stay grounded in the provided facts
+- explanation must stay grounded in the provided input
+
 """.strip()
 
 

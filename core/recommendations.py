@@ -3,22 +3,43 @@ from core.models import AnalysisResult
 
 def build_next_steps(analysis: AnalysisResult) -> list[str]:
     steps = get_base_next_steps(analysis.risk_level)
-    triggered_rul_ids = {rule.rule_id for rule in analysis.triggered_rules}
+    triggered_rule_ids = {rule.rule_id for rule in analysis.triggered_rules}
 
-    if "from_reply_to_mismatch" in triggered_rul_ids:
+    if "from_reply_to_mismatch" in triggered_rule_ids:
         steps.append("Do not reply directly to the email. Use official contact details instead.")
 
-    if has_link_risk(triggered_rul_ids):
+    if has_link_risk(triggered_rule_ids):
         steps.append("Do not click the link. Visit the website manually if you need to verify it.")
 
-    if "high_risk_phrases" in triggered_rul_ids:
+    if "high_risk_phrases" in triggered_rule_ids:
         steps.append("Do not enter your password, verification code, or personal details.")
 
-    if has_spam_or_scam_risk(triggered_rul_ids):
+    if has_spam_or_scam_risk(triggered_rule_ids):
         steps.append("Do not respond, claim rewards, send money, or share financial information.")
 
-    if "invoice_payment_language" in triggered_rul_ids:
+    if "invoice_payment_language" in triggered_rule_ids:
         steps.append("Confirm the request with the company or finance team using known contact details before making any payment.")
+
+
+    if "impersonation_wording" in triggered_rule_ids:
+        steps.append(
+            "Verify the message through the official website or known contact details, not through the email."
+        )
+
+    if "lookalike_domain_typosquat" in triggered_rule_ids:
+        steps.append(
+            "Do not trust a domain just because it looks familiar. Type the official website address manually."
+        )
+
+    if "brand_link_mismatch" in triggered_rule_ids:
+        steps.append(
+            "Do not use the link in the email. Go to the brand's official website directly instead."
+        )
+
+    if "many_links_short_email" in triggered_rule_ids:
+        steps.append(
+            "Avoid clicking any links in the message. Verify the request through a trusted source first."
+        )
 
     return deduplicate_steps(steps)[:5]
 

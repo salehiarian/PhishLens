@@ -1,11 +1,27 @@
 import os
-import streamlit as st
+
+def _get_streamlit_secret(name: str) -> str | None:
+    try:
+        import streamlit as st
+
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except (ModuleNotFoundError, AttributeError, RuntimeError):
+        return None
+
+    return None
 
 
 def get_setting(name: str, default: str) -> str:
-    if name in st.secrets:
-        return str(st.secrets[name])
-    return os.getenv(name, default)
+    secret_value = _get_streamlit_secret(name)
+    if secret_value is not None:
+        return secret_value
+
+    env_value = os.getenv(name, default)
+    if env_value is not None and env_value.strip():
+        return env_value
+
+    return default
 
 
 def get_bool_setting(name: str, default: bool) -> bool:
@@ -14,20 +30,23 @@ def get_bool_setting(name: str, default: bool) -> bool:
 
 
 def get_int_setting(name: str, default: int) -> int:
-    return int(get_setting(name, str(default)))
+    try:
+        return int(get_setting(name, str(default)))
+    except (TypeError, ValueError):
+        return default
 
-AI_ENABLED = get_bool_setting("AI_ENABLED", False)
+AI_ENABLED = get_bool_setting("AI_ENABLED", True)
 AI_PROVIDER = get_setting("AI_PROVIDER", "ollama")
 OLLAMA_URL = get_setting("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 DEFAULT_MODEL = get_setting("DEFAULT_MODEL", "llama3.2:3b")
-AI_TIMEOUT_SECONDS = get_int_setting("AI_TIMEOUT_SECONDS", 30)
+AI_TIMEOUT_SECONDS = get_int_setting("AI_TIMEOUT_SECONDS", 60)
 DEBUG = get_bool_setting("DEBUG", False)
 
-MAX_SCORE = 100
+MAX_SCORE = 99
 MEDIUM_RISK_MIN = 30
 HIGH_RISK_MIN = 65
 STRONG_RULE_WEIGHT = 15
-MAX_TOP_REASONS = 5
+MAX_TOP_REASONS = 4
 
 EXCLAMATION_BOUND = 4
 QUESTION_BOUND = 4

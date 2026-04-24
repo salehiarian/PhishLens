@@ -17,7 +17,7 @@ PARSED_COLLAPSED_HEIGHT = 96
 PARSED_EXPANDED_HEIGHT = 160
 
 ANALYZE_INFO_TEXT = "Please paste an email below to check for phishing signs and get clear guidance on what to do next."
-AI_NOT_READY_TEXT = "AI explanation has not generated yet."
+AI_NOT_READY_TEXT = "AI explanation has not been generated yet."
 PARSED_DETAILS_TOGGLE_KEY = "show_parsed_details"
 
 RULES_PER_ROW = 2

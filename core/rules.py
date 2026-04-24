@@ -1,4 +1,6 @@
 from typing import Sequence
+
+from core.debug import debug
 from core.models import ParsedEmail, RuleResult, AnalysisResult, AIResult
 import re
 
@@ -30,9 +32,97 @@ from data.suspicious_phrases import (
     SUSPICIOUS_TLDS,
     URGENT_PHRASES,
     SCAM_OFFER_PHRASES,
-    SPAM_LURE_PHRASES,
+    SPAM_LURE_PHRASES, strong_phrases, weak_terms, GENERIC_GREETING_PHRASES,
 )
 
+def normalize_lookalike_text(text: str) -> str:
+    normalized = text.lower()
+
+    replacements = {
+        "0": "o",
+        "1": "l",
+        "2": "z",
+        "3": "e",
+        "5": "s",
+        "6": "g",
+        "7": "t",
+        "8": "b",
+        "9": "g",
+        "@": "a",
+        "$": "s",
+        "!": "i",
+    }
+
+    for source, target in replacements.items():
+        normalized = normalized.replace(source, target)
+
+    normalized = normalized.replace("rn", "m")
+    normalized = normalized.replace("vv", "w")
+    normalized = normalized.replace("cl", "d")
+    normalized = normalized.replace("ri", "n")
+    normalized = normalized.replace("li", "h")
+
+    normalized = normalized.replace("-", "")
+    normalized = normalized.replace("_", "")
+
+    return normalized
+
+def edit_distance(left: str, right: str) -> int:
+    if left == right:
+        return 0
+
+    if not left:
+        return len(right)
+
+    if not right:
+        return len(left)
+
+    previous_row = list(range(len(right) + 1))
+
+    for i, left_char in enumerate(left, start=1):
+        current_row = [i]
+        for j, right_char in enumerate(right, start=1):
+            insert_cost = current_row[j - 1] + 1
+            delete_cost = previous_row[j] + 1
+            replace_cost = previous_row[j - 1] + (left_char != right_char)
+            current_row.append(min(insert_cost, delete_cost, replace_cost))
+        previous_row = current_row
+
+    return previous_row[-1]
+
+
+def is_lookalike_domain(host: str, brand: str) -> bool:
+    normalized_brand = normalize_lookalike_text(brand)
+    tokens = extract_domain_tokens(host)
+
+    if brand in host:
+        return False
+
+    for token in tokens:
+        normalized_token = normalize_lookalike_text(token)
+
+        if normalized_token == normalized_brand:
+            return True
+
+        distance = edit_distance(normalized_token, normalized_brand)
+
+        if len(normalized_brand) <= 6 and distance <= 1:
+            return True
+
+        if len(normalized_brand) > 6 and distance <= 2:
+            return True
+
+    return False
+
+def extract_domain_tokens(host: str) -> list[str]:
+    cleaned_host = _normalize_host(host)
+    base_host = cleaned_host.split(".")[0]
+
+    tokens = [token for token in base_host.split("-") if token]
+    if not tokens:
+        return [base_host]
+
+    return tokens
 
 def _brand_in_host(brand: str, host: str) -> bool:
     return re.search(rf"(^|[.-]){re.escape(brand)}([.-]|$)", host) is not None
@@ -258,6 +348,25 @@ def check_scam_offer_language(parsed: ParsedEmail) -> RuleResult:
         evidence=hits,
     )
 
+def check_invoice_payment_language(parsed: ParsedEmail) -> RuleResult:
+    text = build_search_text(parsed.subject, parsed.body_text)
+
+    strong_hits = [p for p in strong_phrases if p in text]
+    weak_hits = [t for t in weak_terms if t in text]
+
+    triggered = bool(strong_hits) or len(weak_hits) >= 2
+    evidence = strong_hits + weak_hits[:3]
+
+    return make_rule_result(
+        rule_id="invoice_payment_language",
+        name="Invoice / payment request language",
+        triggered=triggered,
+        weight=14,
+        reason="Invoice or payment-request language detected",
+        evidence=evidence,
+    )
+
+
 def check_ip_based_link(parsed: ParsedEmail) -> RuleResult:
     hits = []
 
@@ -406,6 +515,14 @@ def get_ai_weight(ai_result: AIResult) -> float:
         return 0.18
     return 0.10
 
+
+def get_confidence_label(confidence: int) -> str:
+    if confidence >= 80:
+        return "High"
+    if confidence >= 50:
+        return "Medium"
+    return "Low"
+
 def blend_rule_and_ai_scores(
     rule_analysis: AnalysisResult,
     ai_result: AIResult,
@@ -443,6 +560,80 @@ def blend_rule_and_ai_scores(
         top_reasons=rule_analysis.top_reasons,
     )
 
+def check_lookalike_domain_typosquat(parsed: ParsedEmail) -> RuleResult:
+    candidates = []
+
+    if parsed.from_domain:
+        candidates.append(parsed.from_domain)
+
+    if parsed.reply_to_domain:
+        candidates.append(parsed.reply_to_domain)
+
+    candidates.extend(parsed.url_domains)
+
+    text_blob = build_search_text(parsed.subject, parsed.from_raw, parsed.body_text)
+    debug(
+        "LOOKALIKE_RULE_DEBUG",
+        text_blob=text_blob,
+        brands_found=[brand for brand in BRANDS if brand in text_blob],
+    )
+    evidence = []
+
+    for domain in candidates:
+        host = _normalize_host(domain)
+
+        for brand in BRANDS:
+            if brand in host:
+                continue
+
+            brand_mentioned = brand in text_blob
+            if not brand_mentioned:
+                continue
+
+            debug("LOOKALIKE_COMPARE_DEBUG",
+                domain=domain,
+                host=host,
+                brand=brand,
+                normalized_host=normalize_lookalike_text(host),
+                normalized_brand=normalize_lookalike_text(brand),
+                is_lookalike=is_lookalike_domain(host, brand),
+            )
+
+            if is_lookalike_domain(host, brand):
+                evidence.append(f"{domain} looks similar to {brand}")
+
+    triggered = bool(evidence)
+
+    debug("LOOKALIKE_RULE_DEBUG",
+        from_domain=parsed.from_domain,
+        reply_to_domain=parsed.reply_to_domain,
+        url_domains=parsed.url_domains,
+        evidence=evidence,
+        triggered=bool(evidence),
+    )
+
+    return make_rule_result(
+        rule_id="lookalike_domain_typosquat",
+        name="Lookalike / typosquatted domain",
+        triggered=triggered,
+        weight=18,
+        reason="Domain looks similar to a trusted brand",
+        evidence=evidence,
+    )
+
+def check_generic_greeting(parsed: ParsedEmail) -> RuleResult:
+    text = build_search_text(parsed.subject, parsed.body_text)
+    hits = [phrase for phrase in GENERIC_GREETING_PHRASES if phrase in text]
+
+    return make_rule_result(
+        rule_id="generic_greeting",
+        name="Generic greeting",
+        triggered=bool(hits),
+        weight=4,
+        reason="Email uses a generic greeting instead of addressing the recipient directly",
+        evidence=hits,
+    )
+
 
 RULE_CHECKS = (
     check_from_reply_to_mismatch,
@@ -450,9 +641,11 @@ RULE_CHECKS = (
     check_high_risk_phrases,
     check_spam_lure_language,
     check_scam_offer_language,
+    check_invoice_payment_language,
     check_excessive_punctuation_or_caps,
     check_impersonation_wording,
     check_suspicious_link_domain,
+    check_lookalike_domain_typosquat,
     check_long_or_messy_domain,
     check_ip_based_link,
     check_punycode_link,
@@ -461,6 +654,7 @@ RULE_CHECKS = (
     check_too_many_subdomains,
     check_brand_link_mismatch,
     check_shortened_url,
+    check_generic_greeting,
 )
 
 

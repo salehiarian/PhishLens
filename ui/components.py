@@ -3,6 +3,7 @@ from typing import Sequence
 import streamlit as st
 
 from core.models import AIResult, AnalysisResult, ParsedEmail, RuleResult
+from core.rules import get_confidence_label
 from ui.constants import (
     MAX_TOP_REASONS, FACTS_COLUMN_WIDTHS, MAX_FACT_DOMAINS, MAX_FACT_PHRASES, \
     MISMATCH_RULE_ID, MAX_RULE_EVIDENCE, RULES_PER_ROW,
@@ -53,11 +54,12 @@ def render_risk_card(analysis_result: AnalysisResult, summary: str, ticket_summa
         st.markdown(f'<div class="risk-score">{analysis_result.score}</div>', unsafe_allow_html=True)
         st.markdown('<div class="muted">Risk score out of 100</div>', unsafe_allow_html=True)
 
+    confidence_label = get_confidence_label(analysis_result.confidence)
     with right:
         st.markdown('<div class="small-label">Confidence</div>', unsafe_allow_html=True)
         st.progress(analysis_result.confidence / 100)
         st.markdown(
-            f'<div class="muted" style="text-align:right;">{analysis_result.confidence}% ({analysis_result.risk_level})</div>',
+            f'<div class="muted" style="text-align:right;">{analysis_result.confidence}% ({confidence_label})</div>',
             unsafe_allow_html=True,
         )
 

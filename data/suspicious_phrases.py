@@ -166,6 +166,30 @@ SCAM_OFFER_PHRASES = {
     "crypto profits",
 }
 
+strong_phrases = {
+    "invoice attached",
+    "payment due",
+    "overdue invoice",
+    "past due",
+    "wire transfer",
+    "bank transfer",
+    "update bank details",
+    "urgent payment",
+    "settle outstanding",
+    "remit payment",
+}
+weak_terms = {
+    "invoice", "payment", "remittance", "payable", "purchase order", "po", "billing"
+}
+
+GENERIC_GREETING_PHRASES = {
+    "dear user",
+    "dear customer",
+    "dear student",
+    "dear account holder",
+    "valued customer",
+    "dear member",
+}
 
 
 

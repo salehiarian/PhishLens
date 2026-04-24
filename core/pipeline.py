@@ -6,9 +6,6 @@ from core.recommendations import build_next_steps
 from core.ai_service import generate_ai_result
 from core.rules import analyze_email, blend_rule_and_ai_scores
 
-AI_EXPLANATION_PLACEHOLDER = "AI explanation not generated yet."
-
-
 def build_analysis_payload(email: str, from_address: str, reply_to_address: str, subject: str, model: str) -> AnalysisPayload:
     parsed = parse_email_content(email, from_address, reply_to_address, subject)
     debug(
